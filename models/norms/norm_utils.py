@@ -1,8 +1,15 @@
 import jittor.nn as nn
+from .spectralnorm import spectral_norm
 
 
 _norm_types_ = ['instance', 'batch', 'syncbatch']
 
+
+def get_spectral_norm(is_spectral=False):
+    if is_spectral:
+        return spectral_norm
+    else:
+        nn.Identity()
 
 def get_norm_layer(norm_type, norm_channel: int):
     assert norm_type in _norm_types_
