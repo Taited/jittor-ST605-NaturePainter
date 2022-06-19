@@ -122,7 +122,7 @@ class SpectralNorm:
         #                            "the same parameter {}".format(name))
 
         fn = SpectralNorm(name, n_power_iterations, dim, eps)
-        weight = module._parameters[name]
+        weight = module.state_dict()[name]
         if weight is None:
             raise ValueError(f'`SpectralNorm` cannot be applied as parameter `{name}` is None')
         # if isinstance(weight, torch.nn.parameter.UninitializedParameter):
@@ -281,8 +281,7 @@ def spectral_norm(module: T_module,
 
     """
     if dim is None:
-        if isinstance(module, (jittor.nn.ConvTranspose,
-                               jittor.nn.ConvTranspose3d)):
+        if isinstance(module, (jittor.nn.ConvTranspose)):
             dim = 1
         else:
             dim = 0

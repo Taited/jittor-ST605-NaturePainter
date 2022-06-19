@@ -3,9 +3,6 @@ sys.path.append('~/codes/jittor-ST605-NaturePainter')
 
 import jittor as jt
 from jittor import nn
-from dummy_vgg19 import vgg19 as official_vgg19_func
-
-__all__ = ['vgg19']
 
 
 def vgg19(pretrained=True):
@@ -147,14 +144,3 @@ def make_vgg19_layers():
     ]
     
     return net_sequence
-
-
-if __name__ == '__main__':
-    self_vgg19 = vgg19(pretrained=True)
-    official_vgg19 = official_vgg19_func(pretrained=True)
-    x = jt.ones((1, 3, 256, 256))
-    self_y = self_vgg19(x)
-    pooling = nn.Pool(kernel_size=2, stride=2, op="maximum")
-    self_y5 = pooling(self_y[4])
-    official_y = official_vgg19(x)
-    pass

@@ -6,8 +6,8 @@ from .SPADE_block import ResnetBlock_with_SPADE
 
 class OASIS_Generator(nn.Module):
     def __init__(self, channels_G, semantic_nc, z_dim, 
-                 norm_type, spade_ks, no_3dnoise,
-                 crop_size, num_res_blocks, aspect_ratio):
+                 norm_type, spade_ks, crop_size, 
+                 num_res_blocks, aspect_ratio, no_3dnoise=False):
         super().__init__()
         
         self.no_3dnoise = no_3dnoise

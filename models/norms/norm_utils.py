@@ -9,7 +9,7 @@ def get_spectral_norm(is_spectral=False):
     if is_spectral:
         return spectral_norm
     else:
-        nn.Identity()
+        return nn.Identity()
 
 def get_norm_layer(norm_type, norm_channel: int):
     assert norm_type in _norm_types_
