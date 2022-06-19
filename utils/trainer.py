@@ -45,9 +45,9 @@ class Trainer:
             EMA_results = self.EMA_gen(data)
         return self.generator(data), EMA_results
     
-    def train_step(self, data, iter):
+    def train_step(self, data):
         real_A, real_B = data['label'], data['image']
-        fake_B = self(real_A)
+        fake_B, fake_B_EMA = self(real_A)
         results = {
             'real_A': real_A,
             'real_B': real_B,

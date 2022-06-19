@@ -20,7 +20,7 @@ class Logger:
         }
         
     def update_timer(self, update_mode):
-        self.timmer[update_mode] = time.tiem()
+        self.timmer[update_mode] = time.time()
     
     def print_log(self, cur_iter, log_var: dict):
         time_log = self.__calc_time__(cur_iter)
