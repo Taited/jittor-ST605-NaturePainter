@@ -2,9 +2,9 @@ import argparse
 import jittor as jt
 import jittor.transform as transform
 from PIL import Image
-import time
 
 from models import OASIS_Generator, OASIS_Discriminator
+from models import GANLoss
 from utils.trainer import Trainer
 from utils.logger import Logger
 from datasets import FlickrDataset
@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--crop_size", type=int, default=512, help="size of image")
     parser.add_argument("--aspect_ratio", type=int, default=2, help="ratio of image height")
     parser.add_argument("--semantic_nc", type=int, default=29, help="num of labels")
-    parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+    parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of cpu threads to use during batch generation")
     
@@ -65,16 +65,16 @@ def train(opt):
         transform.ImageNormalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])]
     
     # Init dataloader
-    # TODO semantic nc
     train_dataloader = FlickrDataset(opt.data_path, 
                                      dataset_mode="train",
+                                     semantic_nc=opt.semantic_nc,
                                      transforms={
                                          "label": label_transforms,
                                          "img": img_transforms},
                                      batch_size=opt.batch_size,
                                      shuffle=True,
                                      num_workers=opt.num_workers)
-
+    
     # Create networks
     generator = OASIS_Generator(opt.channels_G, opt.semantic_nc,
                                 opt.z_dim, opt.norm_type,
@@ -85,50 +85,74 @@ def train(opt):
                                         opt.num_res_blocks,
                                         opt.semantic_nc)
     
+    # Loss Dict
+    generator_loss_dict = {
+        'gan_loss': GANLoss(
+            gan_type='hinge',
+            loss_weight=1.0
+        )
+    }
+    
+    discriminator_loss_dict = {
+        'gan_loss': GANLoss(
+            gan_type='hinge',
+            loss_weight=1.0
+        )
+    }
+    
     # Optimizers
-    optimizer_G = jt.optim.Adam(generator.parameters(), lr=opt.lr_G, betas=(opt.b1, opt.b2))
-    optimizer_D = jt.optim.Adam(discriminator.parameters(), lr=opt.lr_D, betas=(opt.b1, opt.b2))
+    optimizer_G = jt.optim.Adam(generator.parameters(), 
+                                lr=opt.lr_G, betas=(opt.b1, opt.b2))
+    optimizer_D = jt.optim.Adam(discriminator.parameters(), 
+                                lr=opt.lr_D, betas=(opt.b1, opt.b2))
 
     # Trainer
     trainer = Trainer(generator, discriminator,
                       optimizer_G, optimizer_D,
-                      {}, {}, workspace=opt.output_path,
-                      is_inference=False, is_EMA=opt.is_EMA, 
-                      EMA_decay=opt.EMA_decay)
+                      generator_loss_dict, discriminator_loss_dict, 
+                      workspace=opt.output_path, is_inference=False, 
+                      is_EMA=opt.is_EMA, EMA_decay=opt.EMA_decay)
     
     # Logger for visualizing loss and print time
     logger = Logger(opt.output_path, opt.total_iter)
     
     # Resume Training
-    start_iter = opt.start_iter
+    cur_iter = opt.start_iter
     if opt.resume_from is not None:
-        start_iter = trainer.load_checkpoint(opt.resume_from)
+        cur_iter = trainer.load_checkpoint(opt.resume_from)
     
     # Begin Training    
-    for iter_id in range(start_iter, opt.total_iter):
+    while True:
         logger.update_timer('before_time')
-        batch_data = train_dataloader[iter_id]
-        logger.update_timer('data_time')
-        results, log_var = trainer.train_step(batch_data)
-        logger.update_timer('after_time')
+        for _, batch_data in enumerate(train_dataloader):
+            logger.update_timer('data_time')
+            results, log_var = trainer.train_step(batch_data)
+            logger.update_timer('after_time')
+            
+            if jt.rank != 0:
+                continue
+            
+            # print log and add to tensorboard
+            if cur_iter % opt.log_interval == 0:
+                logger.print_log(cur_iter, log_var)  # within tensorboard update
+            
+            # save images
+            if cur_iter % opt.img_interval == 0:
+                results
+                pass
         
-        if jt.rank != 0:
-            continue
-        
-        # print log and add to tensorboard
-        if iter_id % opt.log_interval == 0:
-            logger.print_log(iter_id, log_var)  # within tensorboard update
-        
-        # save images
-        if iter_id % opt.img_interval == 0:
-            results
-            pass
-    
-        if iter_id % opt.val_interval == 0:
-            # eval(epoch, writer)
-            trainer.valid_step()
-            # Save model checkpoints
-            trainer.save_checkpoint(iter_id)
+            if cur_iter % opt.val_interval == 0:
+                # eval(epoch, writer)
+                trainer.valid_step()
+                # Save model checkpoints
+                trainer.save_checkpoint(cur_iter)
+            
+            logger.update_timer('before_time')
+            cur_iter += 1
+            if cur_iter >= opt.total_iter:
+                break
+        if cur_iter >= opt.total_iter:
+                break
 
 
 if __name__ == '__main__':
