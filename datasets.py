@@ -2,7 +2,7 @@ import glob
 import os
 import numpy as np
 
-from jittor.dataset.dataset import Dataset
+from jittor.dataset import Dataset
 import jittor.transform as transform
 import jittor as jt
 from PIL import Image
@@ -11,6 +11,7 @@ from PIL import Image
 class FlickrDataset(Dataset):
     def __init__(self, root, is_train_phase=True, 
                  dataset_mode="train", transforms=None,
+                 semantic_nc=29,
                  *args, **kwargs):
         """
             root: file root of dataset 
@@ -22,6 +23,7 @@ class FlickrDataset(Dataset):
         self.label_transforms = transform.Compose(transforms['label'])
         self.img_transforms = transform.Compose(transforms['img'])
         self.is_train_phase = is_train_phase
+        self.semantic_nc = semantic_nc
         
         self.labels = sorted(glob.glob(
             os.path.join(root, dataset_mode, "labels") + "/*.png"))
@@ -34,7 +36,6 @@ class FlickrDataset(Dataset):
             # check correspondency
             assert len(self.labels) == len(self.files)
             
-
     def __getitem__(self, index):
         label_path = self.labels[index % self.total_len]
         photo_id = label_path.split('/')[-1][:-4]
@@ -50,8 +51,11 @@ class FlickrDataset(Dataset):
         else:
             img_A = np.empty([1])
         img_B = self.label_transforms(img_B)
+        img_B = jt.float32(np.array(img_B))
+        img_B = jt.permute(img_B, (2, 0, 1))
+        label = self.seg_onehot(img_B)
         results = {
-            'label': jt.float32(np.array(img_B)),
+            'label': label,
             'image': jt.float32(img_A),
             'photo_id': photo_id
         }
@@ -59,3 +63,9 @@ class FlickrDataset(Dataset):
     
     def __len__(self):
         return self.total_len
+    
+    def seg_onehot(self, array):
+        _, w, h = array.shape
+        label = jt.zeros((self.semantic_nc, w, h))
+        label = label.scatter_(0, array[0:1, :, :], jt.ones(1))
+        return label
