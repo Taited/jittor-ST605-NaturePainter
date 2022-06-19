@@ -29,7 +29,7 @@ class ResnetBlock_with_SPADE(nn.Module):
         if self.learned_shortcut:
             self.norm_s = SPADE(spade_ks, norm_type,
                                 fin, spade_conditional_input_dims)
-        self.activ = nn.LeakyReLU(0.2, inplace=True)
+        self.activ = nn.LeakyReLU(0.2)
 
     def execute(self, x, seg):
         if self.learned_shortcut:
