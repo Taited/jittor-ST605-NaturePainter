@@ -18,7 +18,7 @@ def stop_grad(model):
 class Trainer:
     def __init__(self, generator: nn.Module, discriminator: nn.Module, 
                  optimizer_G: nn.Optimizer, optimizer_D: nn.Optimizer, 
-                 disc_loss_dict, gen_loss_dict, workspace, 
+                 gen_loss_dict, disc_loss_dict, workspace, 
                  is_inference=False, is_EMA=True, EMA_decay=0.9999):
         self.generator = generator
         self.is_EMA = is_EMA
@@ -51,46 +51,80 @@ class Trainer:
         results = {
             'real_A': real_A,
             'real_B': real_B,
-            'fake_B': fake_B
+            'fake_B': fake_B,
+            'fake_B_EMA': fake_B_EMA
         }
+        log_var = {}
         
         # ---------------------
         #  Train Discriminator
         # ---------------------
-        start_grad(self.discriminator)
+        # start_grad(self.discriminator)
         loss_D, log_D_loss = self._get_disc_loss(results)
+        log_var.update(log_D_loss)
+        # loss_D.sync()
         self.optim_D.step(loss_D)
 
         # ------------------
         #  Train Generators
         # ------------------
-        stop_grad(self.discriminator)
+        # stop_grad(self.discriminator)
         loss_G, log_G_loss = self._get_gen_loss(results)
+        log_var.update(log_G_loss)
+        # loss_G.sync()
         self.optim_G.step(loss_G)
         
         jt.sync_all(True)
-        
-        return results, log_G_loss
+        return results, log_var
         
     def _get_disc_loss(self, results):
-        fake_AB = jt.contrib.concat((results['real_A'], 
-                                     results['fake_B']), 1) 
-        pred_fake = self.discriminator(fake_AB.detach())
-        loss_D_fake = self.criterion_GAN(pred_fake, False)
-        real_AB = jt.contrib.concat((results['real_A'], 
-                                     results['real_B']), 1)
-        pred_real = self.discriminator(real_AB)
-        loss_D_real = self.criterion_GAN(pred_real, True)
+        log_var = {}
+        pred_fake = self.discriminator(results['fake_B'].detach())
+        pred_real = self.discriminator(results['real_B'])
+        
+        if 'oasis_loss' in self.disc_loss_dict:
+            loss_func = self.disc_loss_dict['oasis_loss']
+            loss_D_fake = loss_func(pred_fake, results['real_A'], for_real=False)
+            loss_D_real = loss_func(pred_real, results['real_A'], for_real=True)
+            log_var['loss_D_fake'] = loss_D_fake
+            log_var['loss_D_real'] = loss_D_real
+            
+        if 'label_mix_loss' in self.disc_loss_dict:
+            loss_func = self.disc_loss_dict['label_mix_loss']
+            mixed_inp, mask = self._generate_labelmix(
+                label=results['real_A'], 
+                fake_image=results['fake_B'].detach(),
+                real_image=results['real_B'])
+            output_D_mixed = self.discriminator(mixed_inp)
+            log_var['loss_label_mix'] = loss_func(
+                mask, output_D_mixed, pred_fake, pred_real)
+
+        # TODO
+        # The sum of loss should be automatically
         loss_D = (loss_D_fake + loss_D_real) * 0.5
-        log_var = {
-            'loss_D_real': loss_D_real,
-            'loss_D_fake': loss_D_fake,
-            'loss_D': loss_D
-        }
-        return loss_D
+        log_var['loss_D'] = loss_D + log_var['loss_label_mix']
+        return loss_D, log_var
     
     def _get_gen_loss(self, results):
-        pass
+        log_var = {}
+        pred_fake = self.discriminator(results['fake_B'])
+        
+        if 'oasis_loss' in self.gen_loss_dict:
+            loss_func = self.gen_loss_dict['oasis_loss']
+            loss_G_fake = loss_func(pred_fake, results['real_A'], for_real=True)
+            log_var['loss_G_fake'] = loss_G_fake
+        
+        return loss_G_fake, log_var
+    
+    def _generate_labelmix(self, label, fake_image, real_image):
+        target_map, _ = jt.argmax(label, dim=1, keepdims=True)
+        all_classes = jt.unique(target_map)
+        for c in all_classes:
+            target_map[target_map == c] = jt.randint(0,2,(1,))
+        target_map = target_map.float()
+        mixed_image = target_map * real_image + \
+            (1 - target_map) * fake_image
+        return mixed_image, target_map
     
     @jt.single_process_scope()
     def valid_step(self, epoch, writer):

@@ -31,8 +31,8 @@ class Logger:
     def __update_loss__(self, cur_iter, log_var: dict):
         print_str = ''
         for var_name in log_var:
-            loss_value = log_var[var_name].detach().cpu().numpy()
-            self.writter(f'train/{var_name}', loss_value, cur_iter)
+            loss_value = log_var[var_name].detach().numpy()
+            self.writter.add_scalar(f'train/{var_name}', loss_value, cur_iter)
             print_str += f'{var_name}: {loss_value} '
         return print_str
     
@@ -40,18 +40,18 @@ class Logger:
         data_time = self.timmer['data_time'] - self.timmer['before_time']
         iter_time = self.timmer['after_time'] - self.timmer['before_time']
         res_time = (self.total_iter - cur_iter) * iter_time
-        print_str = f'data time: {data_time}, \
-            iter time: {iter_time}, \
-                ETA: {self.__seconds_to_dhm__(res_time)} '
+        print_str = f'data time: {data_time:.2f}, '
+        print_str += f'iter time: {iter_time:.2f}, '
+        print_str += f'ETA: {self.__seconds_to_dhm__(res_time)} '
         return print_str
     
     def __seconds_to_dhm__(self, seconds):
         def _days(day):
-            return "{} d ".format(day) if day > 1 else ""
+            return f"{day:.1f}d " if day > 1 else ""
         def _hours(hour):  
-            return "{} h ".format(hour) if hour > 1 else ""
+            return f"{hour:.1f}h " if hour > 1 else ""
         def _minutes(minute):
-            return "{} m".format(minute) if minute > 1 else ""     
+            return f"{minute:.1f}m " if minute > 1 else ""     
         days = seconds // (3600 * 24)
         hours = (seconds // 3600) % 24
         minutes = (seconds // 60) % 60

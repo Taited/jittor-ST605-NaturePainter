@@ -4,11 +4,12 @@ import jittor.transform as transform
 from PIL import Image
 
 from models import OASIS_Generator, OASIS_Discriminator
-from models import GANLoss
+from models import OasisLoss, LabelMixLoss
 from utils.trainer import Trainer
 from utils.logger import Logger
 from datasets import FlickrDataset
 
+jt.flags.use_cuda = 1
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -24,16 +25,22 @@ def parse_args():
     parser.add_argument('--z_dim', type=int, default=64, help="dimension of the latent z vector")
     parser.add_argument('--is_spectral', type=bool, default=True, help="whether use spectral normalization")
 
+    # loss setting
+    parser.add_argument('--no_labelmix', action='store_true', default=False, help="whether use label mix")
+    parser.add_argument('--no_balancing_inloss', action='store_true', default=False, help="whether balance loss")
+    parser.add_argument('--lambda_labelmix', default=0.1, type=float, help="coefficients for label mix loss")
+                        
     # data setting
     parser.add_argument("--data_path", type=str, default="./dataset/flickr/")
     parser.add_argument("--load_size", type=int, default=512, help="size of image")
     parser.add_argument("--crop_size", type=int, default=512, help="size of image")
     parser.add_argument("--aspect_ratio", type=int, default=2, help="ratio of image height")
     parser.add_argument("--semantic_nc", type=int, default=29, help="num of labels")
+    parser.add_argument("--contain_dontcare_label", action='store_true', default=False, help="whether balance loss")
     parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of cpu threads to use during batch generation")
-    
+
     # optim setting
     parser.add_argument("--lr_G", type=float, default=0.0004, help="adam: learning rate of generator")
     parser.add_argument("--lr_D", type=float, default=0.0004, help="adam: learning rate of generator")
@@ -48,6 +55,11 @@ def parse_args():
     parser.add_argument("--sample_interval", type=int, default=500, help="interval of sampling iterations")
     parser.add_argument("--checkpoint_interval", type=int, default=20, help="interval between model checkpoints")
     parser.add_argument("--resume_from", type=str, default=None, help="interval between model checkpoints")
+    
+    # log setting
+    parser.add_argument("--log_interval", type=int, default=10, help="interval for printing logs")
+    parser.add_argument("--img_interval", type=int, default=50, help="interval for saving images")
+    parser.add_argument("--val_interval", type=int, default=500, help="interval for saving images")
     
     opt = parser.parse_args()
     return opt
@@ -76,27 +88,30 @@ def train(opt):
                                      num_workers=opt.num_workers)
     
     # Create networks
-    generator = OASIS_Generator(opt.channels_G, opt.semantic_nc,
-                                opt.z_dim, opt.norm_type,
-                                opt.spade_ks, opt.crop_size,
-                                opt.num_res_blocks, opt.aspect_ratio, 
-                                opt.no_3dnoise)
-    discriminator = OASIS_Discriminator(opt.is_spectral, 
-                                        opt.num_res_blocks,
-                                        opt.semantic_nc)
+    generator = OASIS_Generator(
+        opt.channels_G, opt.semantic_nc,
+        opt.z_dim, opt.norm_type,
+        opt.spade_ks, opt.crop_size,
+        opt.num_res_blocks, opt.aspect_ratio, 
+        opt.no_3dnoise)
+    discriminator = OASIS_Discriminator(
+        opt.is_spectral, 
+        opt.num_res_blocks,
+        opt.semantic_nc)
     
     # Loss Dict
     generator_loss_dict = {
-        'gan_loss': GANLoss(
-            gan_type='hinge',
-            loss_weight=1.0
-        )
+        'oasis_loss': OasisLoss(
+            no_balancing_inloss=opt.no_balancing_inloss,
+            contain_dontcare_label=opt.contain_dontcare_label),
     }
     
     discriminator_loss_dict = {
-        'gan_loss': GANLoss(
-            gan_type='hinge',
-            loss_weight=1.0
+        'oasis_loss': OasisLoss(
+            no_balancing_inloss=opt.no_balancing_inloss,
+            contain_dontcare_label=opt.contain_dontcare_label),
+        'label_mix_loss': LabelMixLoss(
+            loss_weight=opt.lambda_labelmix
         )
     }
     
@@ -108,8 +123,10 @@ def train(opt):
 
     # Trainer
     trainer = Trainer(generator, discriminator,
-                      optimizer_G, optimizer_D,
-                      generator_loss_dict, discriminator_loss_dict, 
+                      optimizer_G=optimizer_G, 
+                      optimizer_D=optimizer_D,
+                      gen_loss_dict=generator_loss_dict, 
+                      disc_loss_dict=discriminator_loss_dict, 
                       workspace=opt.output_path, is_inference=False, 
                       is_EMA=opt.is_EMA, EMA_decay=opt.EMA_decay)
     
@@ -124,24 +141,27 @@ def train(opt):
     # Begin Training    
     while True:
         logger.update_timer('before_time')
+        # It's a iter based training pipeline, 
+        # so ignore the batch id and epoch number.
         for _, batch_data in enumerate(train_dataloader):
             logger.update_timer('data_time')
             results, log_var = trainer.train_step(batch_data)
             logger.update_timer('after_time')
             
+            # Only process log stuffs in rank 0
             if jt.rank != 0:
                 continue
             
             # print log and add to tensorboard
-            if cur_iter % opt.log_interval == 0:
+            if (cur_iter + 1) % opt.log_interval == 0:
                 logger.print_log(cur_iter, log_var)  # within tensorboard update
             
             # save images
-            if cur_iter % opt.img_interval == 0:
+            if (cur_iter + 1) % opt.img_interval == 0:
                 results
                 pass
         
-            if cur_iter % opt.val_interval == 0:
+            if (cur_iter + 1) % opt.val_interval == 0:
                 # eval(epoch, writer)
                 trainer.valid_step()
                 # Save model checkpoints

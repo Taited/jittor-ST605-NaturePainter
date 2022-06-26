@@ -59,22 +59,22 @@ class residual_block_D(nn.Module):
         else:
             if self.up_or_down > 0:
                 self.conv1 = nn.Sequential(
-                    nn.LeakyReLU(0.2, False), 
+                    nn.LeakyReLU(0.2), 
                     nn.Upsample(scale_factor=2), 
                     norm_layer(nn.Conv2d(fin, fmiddle, 3, 1, 1)))
             else:
                 self.conv1 = nn.Sequential(
-                    nn.LeakyReLU(0.2, False), 
+                    nn.LeakyReLU(0.2), 
                     norm_layer(nn.Conv2d(fin, fmiddle, 3, 1, 1)))
         self.conv2 = nn.Sequential(
-            nn.LeakyReLU(0.2, False), 
+            nn.LeakyReLU(0.2), 
             norm_layer(nn.Conv2d(fmiddle, fout, 3, 1, 1)))
         if self.learned_shortcut:
             self.conv_s = norm_layer(nn.Conv2d(fin, fout, 1, 1, 0))
         if up_or_down > 0:
             self.sampling = nn.Upsample(scale_factor=2)
         elif up_or_down < 0:
-            self.sampling = nn.AvgPool2d(2)
+            self.sampling = nn.AvgPool2d(kernel_size=2, stride=2)
         else:
             self.sampling = nn.Sequential()
 
