@@ -145,6 +145,7 @@ def train(opt):
         # so ignore the batch id and epoch number.
         for _, batch_data in enumerate(train_dataloader):
             logger.update_timer('data_time')
+            print('Hello World!')
             results, log_var = trainer.train_step(batch_data)
             logger.update_timer('after_time')
             
@@ -163,7 +164,7 @@ def train(opt):
         
             if (cur_iter + 1) % opt.val_interval == 0:
                 # eval(epoch, writer)
-                trainer.valid_step()
+                # trainer.valid_step()
                 # Save model checkpoints
                 trainer.save_checkpoint(cur_iter)
             

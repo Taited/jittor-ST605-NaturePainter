@@ -126,24 +126,6 @@ class Trainer:
             (1 - target_map) * fake_image
         return mixed_image, target_map
     
-    @jt.single_process_scope()
-    def valid_step(self, epoch, writer):
-        cnt = 1
-        os.makedirs(f"{opt.output_path}/images/test_fake_imgs/epoch_{epoch}", exist_ok=True)
-        for i, (_, real_A, photo_id) in enumerate(val_dataloader):
-            fake_B = generator(real_A)
-            
-            if i == 0:
-                # visual image result
-                img_sample = np.concatenate([real_A.data, fake_B.data], -2)
-                img = save_image(img_sample, f"{opt.output_path}/images/epoch_{epoch}_sample.png", nrow=5)
-                writer.add_image('val/image', img.transpose(2,0,1), epoch)
-
-            fake_B = ((fake_B + 1) / 2 * 255).numpy().astype('uint8')
-            for idx in range(fake_B.shape[0]):
-                cv2.imwrite(f"{opt.output_path}/images/test_fake_imgs/epoch_{epoch}/{photo_id[idx]}.jpg", fake_B[idx].transpose(1,2,0)[:,:,::-1])
-                cnt += 1
-    
     def save_checkpoint(self, epoch):
         file_name = f'checkpoint_{epoch}.pkl'
         save_path = osp.join(self.ckpt_space, file_name)

@@ -49,7 +49,7 @@ class OASIS_Generator(nn.Module):
             z = z.view(z.size(0), self.z_dim, 1, 1)
             z = z.expand((z.size(0), self.z_dim, seg.size(2), seg.size(3)))
             seg = jt.concat((z, seg), dim = 1)
-        x = nn.interpolate(seg, size=(self.init_H, self.init_W))
+        x = nn.interpolate(seg, size=(self.init_W, self.init_H))
         x = self.fc(x)
         for i in range(self.num_res_blocks):
             x = self.body[i](x, seg)
