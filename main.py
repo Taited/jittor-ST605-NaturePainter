@@ -2,6 +2,7 @@ import argparse
 import jittor as jt
 import jittor.transform as transform
 from PIL import Image
+from tqdm import tqdm
 
 from models import OASIS_Generator, OASIS_Discriminator
 from models import OasisLoss, LabelMixLoss
@@ -17,7 +18,7 @@ def parse_args():
     # model setting
     parser.add_argument('--num_res_blocks', type=int, default=6, help='number of residual blocks in G and D')
     parser.add_argument('--channels_G', type=int, default=64, help='# of gen filters in first conv layer in generator')
-    parser.add_argument('--norm_type', type=str, default='syncbatch', help='which norm to use in generator before SPADE')
+    parser.add_argument('--norm_type', type=str, default='instance', help='which norm to use in generator before SPADE')
     parser.add_argument('--spade_ks', type=int, default=3, help='kernel size of convs inside SPADE')
     parser.add_argument('--is_EMA', type=bool, default=True, help='if specified, do *not* compute exponential moving averages')
     parser.add_argument('--EMA_decay', type=float, default=0.999, help='decay in exponential moving averages')
@@ -58,7 +59,7 @@ def parse_args():
     
     # log setting
     parser.add_argument("--log_interval", type=int, default=10, help="interval for printing logs")
-    parser.add_argument("--img_interval", type=int, default=50, help="interval for saving images")
+    parser.add_argument("--res_name", type=list, default=['real_B', 'fake_B', 'fake_B_EMA'], help="name for saving images")
     parser.add_argument("--val_interval", type=int, default=500, help="interval for saving images")
     
     opt = parser.parse_args()
@@ -85,6 +86,15 @@ def train(opt):
                                          "img": img_transforms},
                                      batch_size=opt.batch_size,
                                      shuffle=True,
+                                     num_workers=opt.num_workers)
+    valid_dataloader = FlickrDataset(opt.data_path, 
+                                     dataset_mode="valid",
+                                     semantic_nc=opt.semantic_nc,
+                                     transforms={
+                                         "label": label_transforms,
+                                         "img": img_transforms},
+                                     batch_size=opt.batch_size,
+                                     shuffle=False,
                                      num_workers=opt.num_workers)
     
     # Create networks
@@ -131,7 +141,7 @@ def train(opt):
                       is_EMA=opt.is_EMA, EMA_decay=opt.EMA_decay)
     
     # Logger for visualizing loss and print time
-    logger = Logger(opt.output_path, opt.total_iter)
+    logger = Logger(opt.output_path, opt.total_iter, opt.res_name)
     
     # Resume Training
     cur_iter = opt.start_iter
@@ -145,8 +155,7 @@ def train(opt):
         # so ignore the batch id and epoch number.
         for _, batch_data in enumerate(train_dataloader):
             logger.update_timer('data_time')
-            print('Hello World!')
-            results, log_var = trainer.train_step(batch_data)
+            _, log_var = trainer.train_step(batch_data)
             logger.update_timer('after_time')
             
             # Only process log stuffs in rank 0
@@ -154,17 +163,15 @@ def train(opt):
                 continue
             
             # print log and add to tensorboard
-            if (cur_iter + 1) % opt.log_interval == 0:
-                logger.print_log(cur_iter, log_var)  # within tensorboard update
-            
-            # save images
-            if (cur_iter + 1) % opt.img_interval == 0:
-                results
-                pass
+            if cur_iter % opt.log_interval == 0:
+                # within tensorboard update
+                logger.print_log(cur_iter, log_var)
         
-            if (cur_iter + 1) % opt.val_interval == 0:
-                # eval(epoch, writer)
-                # trainer.valid_step()
+            if cur_iter % opt.val_interval == 0:
+                # evaluation on valid dataset
+                for batch_id, batch_data in tqdm(enumerate(valid_dataloader)):
+                    valid_results = trainer.valid_step(batch_data)
+                    logger.update_imgs(cur_iter, batch_id, valid_results)
                 # Save model checkpoints
                 trainer.save_checkpoint(cur_iter)
             

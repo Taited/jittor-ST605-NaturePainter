@@ -80,7 +80,18 @@ class Trainer:
             self.__update_ema()
 
         return results, log_var
-        
+    
+    def valid_step(self, data):
+        real_A, real_B = data['label'], data['image']
+        fake_B, fake_B_EMA = self(real_A)
+        results = {
+            'real_A': real_A,
+            'real_B': real_B,
+            'fake_B': fake_B,
+            'fake_B_EMA': fake_B_EMA
+        }
+        return results
+
     def _get_disc_loss(self, results):
         log_var = {}
         pred_fake = self.discriminator(results['fake_B'].detach())
