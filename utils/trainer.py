@@ -75,6 +75,10 @@ class Trainer:
         self.optim_G.step(loss_G)
         
         jt.sync_all(True)
+        # update ema
+        if self.is_EMA:
+            self.__update_ema()
+
         return results, log_var
         
     def _get_disc_loss(self, results):
@@ -126,6 +130,14 @@ class Trainer:
             (1 - target_map) * fake_image
         return mixed_image, target_map
     
+    def __update_ema(self):
+        ema_state_dict = self.EMA_gen.state_dict()
+        gen_state_dict = self.generator.state_dict()
+        for key in ema_state_dict:
+            ema_state_dict[key] = copy.deepcopy( 
+                ema_state_dict[key].data * self.EMA_decay +
+                gen_state_dict[key].data * (1 - self.EMA_decay))
+
     def save_checkpoint(self, epoch):
         file_name = f'checkpoint_{epoch}.pkl'
         save_path = osp.join(self.ckpt_space, file_name)
