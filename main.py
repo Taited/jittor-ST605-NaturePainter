@@ -160,6 +160,7 @@ def train(opt):
             
             # Only process log stuffs in rank 0
             if jt.rank != 0:
+                logger.update_timer('before_time')
                 continue
             
             # print log and add to tensorboard

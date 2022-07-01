@@ -134,3 +134,4 @@ dmypy.json
 dataset
 training_results
 *.png
+*.out

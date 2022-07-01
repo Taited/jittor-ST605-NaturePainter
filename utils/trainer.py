@@ -154,19 +154,24 @@ class Trainer:
         save_path = osp.join(self.ckpt_space, file_name)
         data = {
             'epoch': epoch,
-            'optim_D': self.optim_D,
-            'optim_G': self.optim_G,
+            'optim_D': self.optim_D.state_dict(),
+            'optim_G': self.optim_G.state_dict(),
             'generator': self.generator.state_dict(),
             'discriminator': self.discriminator.state_dict()
         }
+        if self.is_EMA:
+            data['EMA_generator'] = self.EMA_gen.state_dict()
         jt.save(data, save_path)
     
     def load_checkpoint(self, ckpt_path):
         state_dict = jt.load(ckpt_path)
-        self.optim_D = state_dict['optim_D']
-        self.optim_G = state_dict['optim_G']
-        self.generator = state_dict['generator']
-        self.discriminator = state_dict['discriminator']
+        self.optim_D.load_state_dict(state_dict['optim_D'])
+        self.optim_G.load_state_dict(state_dict['optim_G'])
+        self.generator.load_state_dict(state_dict['generator'])
+        self.discriminator.load_state_dict(state_dict['discriminator'])
+        if self.is_EMA:
+            self.EMA_gen.load_state_dict(state_dict['EMA_generator'])
+        print(f"Successfully loaded from checkpoint: {ckpt_path}")
         return state_dict['epoch']
     
     def __prepare_workspace__(self):
