@@ -32,6 +32,7 @@ class Trainer:
         
         if self.is_EMA:
             self.EMA_gen = copy.deepcopy(self.generator)
+            stop_grad(self.EMA_gen)
             self.EMA_decay = EMA_decay
         
         # Init workspaces
@@ -41,8 +42,9 @@ class Trainer:
         
     def __call__(self, data):
         EMA_results = None
-        if self.is_EMA:
-            EMA_results = self.EMA_gen(data)
+        with jt.no_grad():
+            if self.is_EMA:
+                EMA_results = self.EMA_gen(data)
         return self.generator(data), EMA_results
     
     def train_step(self, data):
@@ -82,15 +84,16 @@ class Trainer:
         return results, log_var
     
     def valid_step(self, data):
-        real_A, real_B = data['label'], data['image']
-        fake_B, fake_B_EMA = self(real_A)
-        results = {
-            'real_A': real_A,
-            'real_B': real_B,
-            'fake_B': fake_B,
-            'fake_B_EMA': fake_B_EMA
-        }
-        return results
+        with jt.no_grad():
+            real_A, real_B = data['label'], data['image']
+            fake_B, fake_B_EMA = self(real_A)
+            results = {
+                'real_A': real_A,
+                'real_B': real_B,
+                'fake_B': fake_B,
+                'fake_B_EMA': fake_B_EMA
+            }
+            return results
 
     def _get_disc_loss(self, results):
         log_var = {}
@@ -129,7 +132,14 @@ class Trainer:
             loss_G_fake = loss_func(pred_fake, results['real_A'], for_real=True)
             log_var['loss_G_fake'] = loss_G_fake
         
-        return loss_G_fake, log_var
+        if 'reconstruction_loss' in self.gen_loss_dict:
+            loss_func = self.gen_loss_dict['reconstruction_loss']
+            loss_reconstruction = loss_func(results)
+            log_var['loss_reconstruction'] = loss_reconstruction
+        
+        loss_G = loss_G_fake + loss_reconstruction
+        log_var['loss_G'] = loss_G
+        return loss_G, log_var
     
     def _generate_labelmix(self, label, fake_image, real_image):
         target_map, _ = jt.argmax(label, dim=1, keepdims=True)
@@ -142,12 +152,13 @@ class Trainer:
         return mixed_image, target_map
     
     def __update_ema(self):
-        ema_state_dict = self.EMA_gen.state_dict()
-        gen_state_dict = self.generator.state_dict()
-        for key in ema_state_dict:
-            ema_state_dict[key] = copy.deepcopy( 
-                ema_state_dict[key].data * self.EMA_decay +
-                gen_state_dict[key].data * (1 - self.EMA_decay))
+        with jt.no_grad():
+            ema_state_dict = self.EMA_gen.state_dict()
+            gen_state_dict = self.generator.state_dict()
+            for key in ema_state_dict:
+                ema_state_dict[key] = copy.deepcopy( 
+                    ema_state_dict[key].data * self.EMA_decay +
+                    gen_state_dict[key].data * (1 - self.EMA_decay))
 
     def save_checkpoint(self, epoch):
         file_name = f'checkpoint_{epoch}.pkl'

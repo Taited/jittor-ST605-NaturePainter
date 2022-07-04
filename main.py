@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from models import OASIS_Generator, OASIS_Discriminator
-from models import OasisLoss, LabelMixLoss
+from models import OasisLoss, LabelMixLoss, L1Loss
 from utils.trainer import Trainer
 from utils.logger import Logger
 from datasets import FlickrDataset
@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--no_labelmix', action='store_true', default=False, help="whether use label mix")
     parser.add_argument('--no_balancing_inloss', action='store_true', default=False, help="whether balance loss")
     parser.add_argument('--lambda_labelmix', default=0.1, type=float, help="coefficients for label mix loss")
+    parser.add_argument('--lambda_reconstruction', default=1.0, type=float, help="coefficients for reconstruction loss")
                         
     # data setting
     parser.add_argument("--data_path", type=str, default="./dataset/flickr/")
@@ -38,7 +39,7 @@ def parse_args():
     parser.add_argument("--aspect_ratio", type=int, default=2, help="ratio of image height")
     parser.add_argument("--semantic_nc", type=int, default=29, help="num of labels")
     parser.add_argument("--contain_dontcare_label", action='store_true', default=False, help="whether balance loss")
-    parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
+    parser.add_argument("--batch_size", type=int, default=3, help="size of the batches")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of cpu threads to use during batch generation")
 
@@ -50,7 +51,7 @@ def parse_args():
     
     # train setting
     parser.add_argument("--start_iter", type=int, default=0, help="iter to start training from")
-    parser.add_argument("--total_iter", type=int, default=100000, help="number of training iterations")
+    parser.add_argument("--total_iter", type=int, default=1000000, help="number of training iterations")
     parser.add_argument("--output_path", type=str, default="./training_results/flickr")
     parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
     parser.add_argument("--sample_interval", type=int, default=500, help="interval of sampling iterations")
@@ -58,9 +59,9 @@ def parse_args():
     parser.add_argument("--resume_from", type=str, default=None, help="interval between model checkpoints")
     
     # log setting
-    parser.add_argument("--log_interval", type=int, default=10, help="interval for printing logs")
+    parser.add_argument("--log_interval", type=int, default=100, help="interval for printing logs")
     parser.add_argument("--res_name", type=list, default=['real_B', 'fake_B', 'fake_B_EMA'], help="name for saving images")
-    parser.add_argument("--val_interval", type=int, default=500, help="interval for saving images")
+    parser.add_argument("--val_interval", type=int, default=1000, help="interval for saving images")
     
     opt = parser.parse_args()
     return opt
@@ -87,16 +88,16 @@ def train(opt):
                                      batch_size=opt.batch_size,
                                      shuffle=True,
                                      num_workers=opt.num_workers)
-    valid_dataloader = FlickrDataset(opt.data_path, 
-                                     dataset_mode="valid",
-                                     semantic_nc=opt.semantic_nc,
-                                     transforms={
-                                         "label": label_transforms,
-                                         "img": img_transforms},
-                                     batch_size=opt.batch_size,
-                                     shuffle=False,
-                                     num_workers=opt.num_workers)
-    
+    # valid_dataloader = FlickrDataset(opt.data_path, 
+    #                                  dataset_mode="valid",
+    #                                  semantic_nc=opt.semantic_nc,
+    #                                  transforms={
+    #                                      "label": label_transforms,
+    #                                      "img": img_transforms},
+    #                                  batch_size=opt.batch_size,
+    #                                  shuffle=False,
+    #                                  num_workers=opt.num_workers)
+            
     # Create networks
     generator = OASIS_Generator(
         opt.channels_G, opt.semantic_nc,
@@ -114,6 +115,11 @@ def train(opt):
         'oasis_loss': OasisLoss(
             no_balancing_inloss=opt.no_balancing_inloss,
             contain_dontcare_label=opt.contain_dontcare_label),
+        'reconstruction_loss': L1Loss(
+            data_info={
+                'pred': 'fake_B',
+                'target': 'real_B'},
+            loss_weight=opt.lambda_reconstruction)
     }
     
     discriminator_loss_dict = {
@@ -155,7 +161,7 @@ def train(opt):
         # so ignore the batch id and epoch number.
         for _, batch_data in enumerate(train_dataloader):
             logger.update_timer('data_time')
-            _, log_var = trainer.train_step(batch_data)
+            train_results, log_var = trainer.train_step(batch_data)
             logger.update_timer('after_time')
             
             # Only process log stuffs in rank 0
@@ -170,9 +176,10 @@ def train(opt):
         
             if cur_iter % opt.val_interval == 0:
                 # evaluation on valid dataset
-                for batch_id, batch_data in tqdm(enumerate(valid_dataloader)):
-                    valid_results = trainer.valid_step(batch_data)
-                    logger.update_imgs(cur_iter, batch_id, valid_results)
+                # for batch_id, batch_data in tqdm(enumerate(valid_dataloader)):
+                #     valid_results = trainer.valid_step(batch_data)
+                #     logger.update_imgs(cur_iter, batch_id, valid_results)
+                logger.update_imgs(cur_iter, 0, train_results)
                 # Save model checkpoints
                 trainer.save_checkpoint(cur_iter)
             
