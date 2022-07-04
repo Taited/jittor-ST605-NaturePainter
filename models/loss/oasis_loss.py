@@ -26,14 +26,15 @@ class OasisLoss():
 def get_class_balancing(input, label, 
                         no_balancing_inloss,
                         contain_dontcare_label):
+    epsilon = 0.00001
     if not no_balancing_inloss:
         class_occurence = jt.sum(label, dims=(0, 2, 3))
         if contain_dontcare_label:
             class_occurence[-1] = 0
         num_of_classes = (class_occurence > 0).sum()
-        coefficients = (1.0 / class_occurence) * \
+        coefficients = (1.0 / (class_occurence + epsilon)) * \
             get_num_elements(label) / \
-                (num_of_classes * label.shape[1])
+                (num_of_classes * label.shape[1] + epsilon)
         integers, _ = jt.argmax(label, dim=1, keepdims=True)
         if contain_dontcare_label:
             coefficients[-1] = 0

@@ -7,7 +7,7 @@ import jittor.nn as nn
 _reduction_modes = ['none', 'mean', 'sum', 'batchmean', 'flatmean']
 
 
-def l1_loss(pred, target):
+def l1_loss(pred, target, weight, reduction):
     """L1 loss.
 
     Args:
@@ -17,7 +17,7 @@ def l1_loss(pred, target):
     Returns:
         Tensor: Calculated L1 loss.
     """
-    return nn.l1_loss(pred, target, reduction='none')
+    return weight * nn.l1_loss(pred, target)
 
 
 def mse_loss(pred, target):
