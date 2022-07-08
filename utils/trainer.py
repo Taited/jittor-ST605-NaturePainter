@@ -54,7 +54,8 @@ class Trainer:
             'real_A': real_A,
             'real_B': real_B,
             'fake_B': fake_B,
-            'fake_B_EMA': fake_B_EMA
+            'fake_B_EMA': fake_B_EMA,
+            'photo_id': data['photo_id']
         }
         log_var = {}
         
@@ -91,7 +92,8 @@ class Trainer:
                 'real_A': real_A,
                 'real_B': real_B,
                 'fake_B': fake_B,
-                'fake_B_EMA': fake_B_EMA
+                'fake_B_EMA': fake_B_EMA,
+                'photo_id': data['photo_id']
             }
             return results
 

@@ -43,14 +43,23 @@ class Logger:
             print_str += f'{var_name}: {loss_value} '
         return print_str
 
-    def update_imgs(self, cur_iter, batch_id, results: dict):
-        save_root = osp.join(self.img_space, str(cur_iter))
+    def update_imgs(self, cur_iter, results: dict, 
+                    phase='train', res_name=None):
+        if res_name == None:
+            res_name = self.res_name
+        save_root = osp.join(self.img_space, str(cur_iter), phase)
         if not osp.exists(save_root):
-            os.mkdir(save_root)
+            os.makedirs(save_root)
 
         for var_name in results:
-            if var_name not in self.res_name:
+            if var_name not in res_name:
                 continue
+            
+            # create sub folder
+            save_res_root = osp.join(save_root, var_name)
+            if not osp.exists(save_res_root):
+                os.mkdir(save_res_root)
+                
             img = results[var_name].detach().numpy()
             img = 255 * (img + 1) / 2
             img = np.clip(img, 0, 255).astype(np.uint8)
@@ -58,10 +67,9 @@ class Logger:
                 img_sample = img[i, :, :, :]
                 img_sample = np.transpose(img_sample, (1, 2, 0))
                 img_sample = Image.fromarray(img_sample)
-                img_id = batch_id * img.shape[0] + i
                 img_sample.save(
                     osp.join(
-                        save_root, f"{var_name}_{img_id}.jpg"))
+                        save_res_root, f"{results['photo_id'][i]}.jpg"))
 
     def __calc_time__(self, cur_iter):
         data_time = self.timmer['data_time'] - self.timmer['before_time']
