@@ -21,7 +21,6 @@ class FlickrDataset(Dataset):
         """
         Dataset.__init__(self, *args, **kwargs)
         self.label_transforms = transform.Compose(transforms['label'])
-        self.img_transforms = transform.Compose(transforms['img'])
         self.is_train_phase = is_train_phase
         self.semantic_nc = semantic_nc
         
@@ -35,6 +34,7 @@ class FlickrDataset(Dataset):
                 os.path.join(root, dataset_mode, "imgs") + "/*.jpg"))
             # check correspondency
             assert len(self.labels) == len(self.files)
+            self.img_transforms = transform.Compose(transforms['img'])
             
     def __getitem__(self, index):
         label_path = self.labels[index % self.total_len]

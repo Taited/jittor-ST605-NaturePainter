@@ -133,5 +133,6 @@ dmypy.json
 .vscode
 dataset
 training_results
+test_output
 *.png
 *.out

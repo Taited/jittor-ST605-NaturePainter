@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--norm_type', type=str, default='instance', help='which norm to use in generator before SPADE')
     parser.add_argument('--spade_ks', type=int, default=3, help='kernel size of convs inside SPADE')
     parser.add_argument('--is_EMA', type=bool, default=True, help='if specified, do *not* compute exponential moving averages')
-    parser.add_argument('--EMA_decay', type=float, default=0.99, help='decay in exponential moving averages')
+    parser.add_argument('--EMA_decay', type=float, default=0.999, help='decay in exponential moving averages')
     parser.add_argument('--no_3dnoise', action='store_true', default=False, help='if specified, do *not* concatenate noise to label maps')
     parser.add_argument('--z_dim', type=int, default=64, help="dimension of the latent z vector")
     parser.add_argument('--is_spectral', type=bool, default=True, help="whether use spectral normalization")
@@ -39,7 +39,8 @@ def parse_args():
     parser.add_argument("--aspect_ratio", type=int, default=2, help="ratio of image height")
     parser.add_argument("--semantic_nc", type=int, default=29, help="num of labels")
     parser.add_argument("--contain_dontcare_label", action='store_true', default=False, help="whether balance loss")
-    parser.add_argument("--batch_size", type=int, default=12, help="size of the batches")
+    parser.add_argument("--train_batch_size", type=int, default=16, help="size of the batches")
+    parser.add_argument("--valid_batch_size", type=int, default=8, help="size of the valid batches")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of cpu threads to use during batch generation")
 
@@ -61,7 +62,13 @@ def parse_args():
     # log setting
     parser.add_argument("--log_interval", type=int, default=100, help="interval for printing logs")
     parser.add_argument("--res_name", type=list, default=['real_B', 'fake_B', 'fake_B_EMA'], help="name for saving images")
-    parser.add_argument("--val_interval", type=int, default=1000, help="interval for saving images")
+    parser.add_argument("--val_interval", type=int, default=1000, help="interval for validation")
+    parser.add_argument("--img_interval", type=int, default=1000, help="interval for saving training images")
+    
+    # test setting
+    parser.add_argument("--test_output", type=str, default="./test_output/flickr_26000")
+    parser.add_argument("--test_ckpt", type=str, default="training_results/flickr/ckpt/checkpoint_26000.pkl")
+    parser.add_argument("--test_batch_size", type=int, default=8)
     
     opt = parser.parse_args()
     return opt
@@ -85,18 +92,18 @@ def train(opt):
                                      transforms={
                                          "label": label_transforms,
                                          "img": img_transforms},
-                                     batch_size=opt.batch_size,
+                                     batch_size=opt.train_batch_size,
                                      shuffle=True,
                                      num_workers=opt.num_workers)
-    # valid_dataloader = FlickrDataset(opt.data_path, 
-    #                                  dataset_mode="valid",
-    #                                  semantic_nc=opt.semantic_nc,
-    #                                  transforms={
-    #                                      "label": label_transforms,
-    #                                      "img": img_transforms},
-    #                                  batch_size=opt.batch_size,
-    #                                  shuffle=False,
-    #                                  num_workers=opt.num_workers)
+    valid_dataloader = FlickrDataset(opt.data_path, 
+                                     dataset_mode="testA",
+                                     is_train_phase=False,
+                                     semantic_nc=opt.semantic_nc,
+                                     transforms={
+                                         "label": label_transforms},
+                                     batch_size=opt.valid_batch_size,
+                                     shuffle=False,
+                                     num_workers=opt.num_workers)
             
     # Create networks
     generator = OASIS_Generator(
@@ -172,13 +179,21 @@ def train(opt):
             if cur_iter % opt.log_interval == 0:
                 # within tensorboard update
                 logger.print_log(cur_iter, log_var)
+                
+            # save training imgs
+            if cur_iter % opt.img_interval == 0:
+                logger.update_imgs(cur_iter, train_results)
         
             if cur_iter % opt.val_interval == 0:
                 # evaluation on valid dataset
-                # for batch_id, batch_data in tqdm(enumerate(valid_dataloader)):
-                #     valid_results = trainer.valid_step(batch_data)
-                #     logger.update_imgs(cur_iter, batch_id, valid_results)
-                logger.update_imgs(cur_iter, 0, train_results)
+                with tqdm(total=len(valid_dataloader)) as pbar:
+                    for _, batch_data in (enumerate(valid_dataloader)):
+                        valid_results = trainer.valid_step(batch_data)
+                        logger.update_imgs(cur_iter, valid_results, 
+                                        phase='testA',
+                                        res_name=['fake_B', 'fake_B_EMA'])
+                        pbar.update(batch_data['label'].shape[0])
+                
                 # Save model checkpoints
                 trainer.save_checkpoint(cur_iter)
             
