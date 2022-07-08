@@ -2,12 +2,65 @@
 Spectral Normalization from https://arxiv.org/abs/1802.05957
 """
 import jittor
+import jittor as jt
 from jittor.misc import normalize
 from typing import Any, Optional, TypeVar
 from jittor.nn import Module
 
 
-class SpectralNorm:
+class SpectralNorm(Module):
+    def __init__(self, module, name='weight', power_iterations=1, eps=1e-12):
+        super(SpectralNorm, self).__init__()
+        self.module = module
+        self.name = name
+        self.power_iterations = power_iterations
+        self.eps = eps
+        if not self._made_params():
+            self._make_params()
+
+    def l2normalize(self, v):
+        return v / (v.norm() + self.eps)
+
+    def _update_u_v(self):
+        u = getattr(self.module, self.name + "_u")
+        v = getattr(self.module, self.name + "_v")
+        w = getattr(self.module, self.name)
+
+        height = w.shape[0]
+        for _ in range(self.power_iterations):
+            v.assign(self.l2normalize((w.view(height,-1).t() * u.unsqueeze(0)).sum(-1)))
+            u.assign(self.l2normalize((w.view(height,-1) * v.unsqueeze(0)).sum(-1)))
+        sigma = (u * (w.view(height,-1) * v.unsqueeze(0)).sum(-1)).sum()
+        getattr(self.module, self.name).assign(w / sigma.expand_as(w))
+
+    def _made_params(self):
+        try:
+            u = getattr(self.module, self.name + "_u")
+            v = getattr(self.module, self.name + "_v")
+            w = getattr(self.module, self.name)
+            return True
+        except AttributeError:
+            return False
+
+    def _make_params(self):
+        w = getattr(self.module, self.name)
+        height = w.shape[0]
+        width = w.view(height, -1).shape[1]
+
+        u = jt.empty([height], dtype=w.dtype).gauss_(0, 1)
+        v = jt.empty([width], dtype=w.dtype).gauss_(0, 1)
+        u = self.l2normalize(u)
+        v = self.l2normalize(v)
+
+        setattr(self.module, self.name + "_u", u.stop_grad())
+        setattr(self.module, self.name + "_v", v.stop_grad())
+
+    def execute(self, *args):
+        self._update_u_v()
+        return self.module.execute(*args)
+
+
+class DiscussSpectralNorm:
     # Invariant before and after each forward call:
     #   u = normalize(W @ v)
     # NB: At initialization, this invariant is not enforced
@@ -162,68 +215,6 @@ class SpectralNorm:
         return fn
 
 
-# This is a top level class because Py2 pickle doesn't like inner class nor an
-# instancemethod.
-# class SpectralNormLoadStateDictPreHook:
-#     # See docstring of SpectralNorm._version on the changes to spectral_norm.
-#     def __init__(self, fn) -> None:
-#         self.fn = fn
-
-#     # For state_dict with version None, (assuming that it has gone through at
-#     # least one training forward), we have
-#     #
-#     #    u = normalize(W_orig @ v)
-#     #    W = W_orig / sigma, where sigma = u @ W_orig @ v
-#     #
-#     # To compute `v`, we solve `W_orig @ x = u`, and let
-#     #    v = x / (u @ W_orig @ x) * (W / W_orig).
-#     def __call__(self, state_dict, prefix, local_metadata, strict,
-#                  missing_keys, unexpected_keys, error_msgs) -> None:
-#         fn = self.fn
-#         version = local_metadata.get('spectral_norm', {}).get(fn.name + '.version', None)
-#         if version is None or version < 1:
-#             weight_key = prefix + fn.name
-#             if version is None and all(weight_key + s in state_dict for s in ('_orig', '_u', '_v')) and \
-#                     weight_key not in state_dict:
-#                 # Detect if it is the updated state dict and just missing metadata.
-#                 # This could happen if the users are crafting a state dict themselves,
-#                 # so we just pretend that this is the newest.
-#                 return
-#             has_missing_keys = False
-#             for suffix in ('_orig', '', '_u'):
-#                 key = weight_key + suffix
-#                 if key not in state_dict:
-#                     has_missing_keys = True
-#                     if strict:
-#                         missing_keys.append(key)
-#             if has_missing_keys:
-#                 return
-#             with jittor.no_grad():
-#                 weight_orig = state_dict[weight_key + '_orig']
-#                 weight = state_dict.pop(weight_key)
-#                 sigma = (weight_orig / weight).mean()
-#                 weight_mat = fn.reshape_weight_to_matrix(weight_orig)
-#                 u = state_dict[weight_key + '_u']
-#                 v = fn._solve_v_and_rescale(weight_mat, u, sigma)
-#                 state_dict[weight_key + '_v'] = v
-
-
-# This is a top level class because Py2 pickle doesn't like inner class nor an
-# instancemethod.
-# class SpectralNormStateDictHook:
-#     # See docstring of SpectralNorm._version on the changes to spectral_norm.
-#     def __init__(self, fn) -> None:
-#         self.fn = fn
-
-#     def __call__(self, module, state_dict, prefix, local_metadata) -> None:
-#         if 'spectral_norm' not in local_metadata:
-#             local_metadata['spectral_norm'] = {}
-#         key = self.fn.name + '.version'
-#         if key in local_metadata['spectral_norm']:
-#             raise RuntimeError("Unexpected key in metadata['spectral_norm']: {}".format(key))
-#         local_metadata['spectral_norm'][key] = self.fn._version
-
-
 T_module = TypeVar('T_module', bound=Module)
 
 def spectral_norm(module: T_module,
@@ -285,7 +276,7 @@ def spectral_norm(module: T_module,
             dim = 1
         else:
             dim = 0
-    SpectralNorm.apply(module, name, n_power_iterations, dim, eps)
+    SpectralNorm(module, name, n_power_iterations, eps)
     return module
 
 

@@ -119,8 +119,8 @@ class Trainer:
 
         # TODO
         # The sum of loss should be automatically
-        loss_D = (loss_D_fake + loss_D_real) * 0.5
-        log_var['loss_D'] = loss_D + log_var['loss_label_mix']
+        loss_D = (loss_D_fake + loss_D_real) * 0.5 + log_var['loss_label_mix']
+        log_var['loss_D'] = loss_D
         return loss_D, log_var
     
     def _get_gen_loss(self, results):
@@ -159,6 +159,7 @@ class Trainer:
                 ema_state_dict[key] = copy.deepcopy( 
                     ema_state_dict[key].data * self.EMA_decay +
                     gen_state_dict[key].data * (1 - self.EMA_decay))
+            self.EMA_gen.load_state_dict(ema_state_dict)
 
     def save_checkpoint(self, epoch):
         file_name = f'checkpoint_{epoch}.pkl'

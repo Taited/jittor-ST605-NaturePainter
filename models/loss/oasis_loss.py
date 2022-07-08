@@ -51,7 +51,7 @@ def get_num_elements(input):
 def get_n1_target(input, label, target_is_real):
     targets = get_target_tensor(input, target_is_real)
     num_of_classes = label.shape[1]
-    _, integers = jt.argmax(label, dim=1)
+    integers, _ = jt.argmax(label, dim=1)
     targets = targets[:, 0, :, :] * num_of_classes
     integers += targets
     integers = jt.clamp(integers, min_v=num_of_classes-1) - num_of_classes + 1
