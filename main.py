@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--norm_type', type=str, default='instance', help='which norm to use in generator before SPADE')
     parser.add_argument('--spade_ks', type=int, default=3, help='kernel size of convs inside SPADE')
     parser.add_argument('--is_EMA', type=bool, default=True, help='if specified, do *not* compute exponential moving averages')
-    parser.add_argument('--EMA_decay', type=float, default=0.999, help='decay in exponential moving averages')
+    parser.add_argument('--EMA_decay', type=float, default=0.99, help='decay in exponential moving averages')
     parser.add_argument('--no_3dnoise', action='store_true', default=False, help='if specified, do *not* concatenate noise to label maps')
     parser.add_argument('--z_dim', type=int, default=64, help="dimension of the latent z vector")
     parser.add_argument('--is_spectral', type=bool, default=True, help="whether use spectral normalization")
@@ -39,13 +39,13 @@ def parse_args():
     parser.add_argument("--aspect_ratio", type=int, default=2, help="ratio of image height")
     parser.add_argument("--semantic_nc", type=int, default=29, help="num of labels")
     parser.add_argument("--contain_dontcare_label", action='store_true', default=False, help="whether balance loss")
-    parser.add_argument("--batch_size", type=int, default=3, help="size of the batches")
+    parser.add_argument("--batch_size", type=int, default=12, help="size of the batches")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of cpu threads to use during batch generation")
 
     # optim setting
-    parser.add_argument("--lr_G", type=float, default=0.0004, help="adam: learning rate of generator")
-    parser.add_argument("--lr_D", type=float, default=0.0004, help="adam: learning rate of generator")
+    parser.add_argument("--lr_G", type=float, default=0.0001, help="adam: learning rate of generator")
+    parser.add_argument("--lr_D", type=float, default=0.0001, help="adam: learning rate of discriminator")
     parser.add_argument("--b1", type=float, default=0, help="adam: decay of first order momentum of gradient")
     parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
     
@@ -156,17 +156,16 @@ def train(opt):
     
     # Begin Training    
     while True:
-        logger.update_timer('before_time')
+        logger.update_timer('before_time', jt.rank)
         # It's a iter based training pipeline, 
         # so ignore the batch id and epoch number.
         for _, batch_data in enumerate(train_dataloader):
-            logger.update_timer('data_time')
+            logger.update_timer('data_time', jt.rank)
             train_results, log_var = trainer.train_step(batch_data)
-            logger.update_timer('after_time')
+            logger.update_timer('after_time', jt.rank)
             
             # Only process log stuffs in rank 0
             if jt.rank != 0:
-                logger.update_timer('before_time')
                 continue
             
             # print log and add to tensorboard
@@ -183,7 +182,7 @@ def train(opt):
                 # Save model checkpoints
                 trainer.save_checkpoint(cur_iter)
             
-            logger.update_timer('before_time')
+            logger.update_timer('before_time', jt.rank)
             cur_iter += 1
             if cur_iter >= opt.total_iter:
                 break

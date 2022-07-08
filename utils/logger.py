@@ -24,7 +24,9 @@ class Logger:
             'after_time': 0.0
         }
         
-    def update_timer(self, update_mode):
+    def update_timer(self, update_mode, rank):
+        if rank != 0:
+            return
         self.timmer[update_mode] = time.time()
     
     def print_log(self, cur_iter, log_var: dict):
