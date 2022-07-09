@@ -18,7 +18,7 @@ def parse_args():
     # model setting
     parser.add_argument('--num_res_blocks', type=int, default=6, help='number of residual blocks in G and D')
     parser.add_argument('--channels_G', type=int, default=64, help='# of gen filters in first conv layer in generator')
-    parser.add_argument('--norm_type', type=str, default='instance', help='which norm to use in generator before SPADE')
+    parser.add_argument('--norm_type', type=str, default='syncbatch', help='which norm to use in generator before SPADE')
     parser.add_argument('--spade_ks', type=int, default=3, help='kernel size of convs inside SPADE')
     parser.add_argument('--is_EMA', type=bool, default=True, help='if specified, do *not* compute exponential moving averages')
     parser.add_argument('--EMA_decay', type=float, default=0.999, help='decay in exponential moving averages')
@@ -29,8 +29,8 @@ def parse_args():
     # loss setting
     parser.add_argument('--no_labelmix', action='store_true', default=False, help="whether use label mix")
     parser.add_argument('--no_balancing_inloss', action='store_true', default=False, help="whether balance loss")
-    parser.add_argument('--lambda_labelmix', default=0.1, type=float, help="coefficients for label mix loss")
-    parser.add_argument('--lambda_reconstruction', default=1.0, type=float, help="coefficients for reconstruction loss")
+    parser.add_argument('--lambda_labelmix', default=5, type=float, help="coefficients for label mix loss")
+    parser.add_argument('--lambda_reconstruction', default=0.1, type=float, help="coefficients for reconstruction loss")
                         
     # data setting
     parser.add_argument("--data_path", type=str, default="./dataset/flickr/")
@@ -52,7 +52,7 @@ def parse_args():
     
     # train setting
     parser.add_argument("--start_iter", type=int, default=0, help="iter to start training from")
-    parser.add_argument("--total_iter", type=int, default=1000000, help="number of training iterations")
+    parser.add_argument("--total_iter", type=int, default=125000, help="number of training iterations")
     parser.add_argument("--output_path", type=str, default="./training_results/flickr")
     parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
     parser.add_argument("--sample_interval", type=int, default=500, help="interval of sampling iterations")

@@ -14,8 +14,8 @@ def get_spectral_norm(is_spectral=False):
 def get_norm_layer(norm_type, norm_channel: int):
     assert norm_type in _norm_types_
     if norm_type == 'instance':
-        return nn.InstanceNorm2d(norm_channel)
+        return nn.InstanceNorm2d(norm_channel, affine=False)
     elif norm_type == 'batch':
-        return nn.BatchNorm2d(norm_channel, sync=False)
+        return nn.BatchNorm2d(norm_channel, sync=False, affine=False)
     elif norm_type == 'syncbatch':
-        return nn.BatchNorm2d(norm_channel, sync=True)
+        return nn.BatchNorm2d(norm_channel, sync=True, affine=False)

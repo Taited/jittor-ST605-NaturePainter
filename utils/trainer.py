@@ -40,16 +40,24 @@ class Trainer:
         self.ckpt_space = osp.join(workspace, 'ckpt')
         self.__prepare_workspace__()
         
-    def __call__(self, data):
+    def __call__(self, data, is_eval=True):
         EMA_results = None
         with jt.no_grad():
             if self.is_EMA:
+                self.EMA_gen.eval()
                 EMA_results = self.EMA_gen(data)
-        return self.generator(data), EMA_results
+        
+        if is_eval:
+            self.generator.eval()
+        else:
+            self.generator.train()
+        gen_results = self.generator(data)
+        
+        return gen_results, EMA_results
     
     def train_step(self, data):
         real_A, real_B = data['label'], data['image']
-        fake_B, fake_B_EMA = self(real_A)
+        fake_B, fake_B_EMA = self(real_A, is_eval=False)
         results = {
             'real_A': real_A,
             'real_B': real_B,
