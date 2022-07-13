@@ -7,7 +7,8 @@ from .SPADE_block import ResnetBlock_with_SPADE
 class OASIS_Generator(nn.Module):
     def __init__(self, channels_G, semantic_nc, z_dim, 
                  norm_type, spade_ks, crop_size, 
-                 num_res_blocks, aspect_ratio, no_3dnoise=False):
+                 num_res_blocks, aspect_ratio, 
+                 no_3dnoise=False, is_sepctral=True):
         super().__init__()
         
         self.no_3dnoise = no_3dnoise
@@ -28,7 +29,7 @@ class OASIS_Generator(nn.Module):
             self.body.append(ResnetBlock_with_SPADE(
                 self.channels[i], self.channels[i+1], z_dim, 
                  norm_type, spade_ks,
-                 semantic_nc, no_3dnoise))
+                 semantic_nc, no_3dnoise, is_sepctral))
         if not no_3dnoise:
             self.fc = nn.Conv2d(semantic_nc + z_dim, 16 * ch, 3, padding=1)
         else:

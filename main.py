@@ -11,6 +11,7 @@ from utils.logger import Logger
 from datasets import FlickrDataset
 
 jt.flags.use_cuda = 1
+jt.misc.set_global_seed(seed=2021)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -45,8 +46,8 @@ def parse_args():
                         help="number of cpu threads to use during batch generation")
 
     # optim setting
-    parser.add_argument("--lr_G", type=float, default=0.0001, help="adam: learning rate of generator")
-    parser.add_argument("--lr_D", type=float, default=0.0001, help="adam: learning rate of discriminator")
+    parser.add_argument("--lr_G", type=float, default=0.0004, help="adam: learning rate of generator")
+    parser.add_argument("--lr_D", type=float, default=0.0004, help="adam: learning rate of discriminator")
     parser.add_argument("--b1", type=float, default=0, help="adam: decay of first order momentum of gradient")
     parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
     
@@ -111,7 +112,7 @@ def train(opt):
         opt.z_dim, opt.norm_type,
         opt.spade_ks, opt.crop_size,
         opt.num_res_blocks, opt.aspect_ratio, 
-        opt.no_3dnoise)
+        opt.no_3dnoise, opt.is_spectral)
     discriminator = OASIS_Discriminator(
         opt.is_spectral, 
         opt.num_res_blocks,

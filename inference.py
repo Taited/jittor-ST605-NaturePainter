@@ -26,7 +26,7 @@ def create_instance(opt):
                                semantic_nc=opt.semantic_nc,
                                transforms={
                                    "label": label_transforms},
-                               batch_size=opt.valid_batch_size,
+                               batch_size=opt.test_batch_size,
                                shuffle=False,
                                num_workers=opt.num_workers)
 
@@ -50,6 +50,8 @@ def load_model(opt, gen, gen_ema):
     state_dict = jt.load(opt.test_ckpt)
     gen.load_state_dict(state_dict['generator'])
     gen_ema.load_state_dict(state_dict['EMA_generator'])
+    gen.eval()
+    gen_ema.eval()
     return gen, gen_ema
     
 

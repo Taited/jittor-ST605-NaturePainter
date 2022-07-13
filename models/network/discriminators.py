@@ -1,7 +1,6 @@
 import jittor as jt
 import jittor.nn as nn
 
-from models.norms.spectralnorm import spectral_norm
 from ..norms.norm_utils import get_spectral_norm
 
 
@@ -29,10 +28,7 @@ class OASIS_Discriminator(nn.Module):
                 is_spectral, 1))
         self.body_up.append(residual_block_D(
             2*self.channels[1], 64, is_spectral, 1))
-        if is_spectral:
-            self.layer_up_last = spectral_norm(nn.Conv2d(64, output_channel, 1, 1, 0))
-        else:
-            self.layer_up_last = nn.Conv2d(64, output_channel, 1, 1, 0)
+        self.layer_up_last = nn.Conv2d(64, output_channel, 1, 1, 0)
 
     def execute(self, input):
         x = input
@@ -46,8 +42,6 @@ class OASIS_Discriminator(nn.Module):
         for i in range(1, len(self.body_down)):
             x = self.body_up[i](jt.concat((encoder_res[-i-1], x), dim=1))
         ans = self.layer_up_last(x)
-        if ans.max() >= 1000:
-            stop = 1
         return ans
 
 
