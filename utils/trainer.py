@@ -142,12 +142,16 @@ class Trainer:
             loss_G_fake = loss_func(pred_fake, results['real_A'], for_real=True)
             log_var['loss_G_fake'] = loss_G_fake
         
-        if 'reconstruction_loss' in self.gen_loss_dict:
-            loss_func = self.gen_loss_dict['reconstruction_loss']
-            loss_reconstruction = loss_func(results)
-            log_var['loss_reconstruction'] = loss_reconstruction
+        for loss_name in self.gen_loss_dict:
+            if loss_name == 'oasis_loss':
+                continue
+            loss_func = self.gen_loss_dict[loss_name]
+            loss_term = loss_func(results)
+            log_var[loss_name] = loss_term
         
-        loss_G = loss_G_fake + loss_reconstruction
+        loss_G = 0.0
+        for loss_term in log_var:
+            loss_G += log_var[loss_term]
         log_var['loss_G'] = loss_G
         return loss_G, log_var
     
