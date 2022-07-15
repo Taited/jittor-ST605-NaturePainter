@@ -136,3 +136,4 @@ training_results
 test_output
 *.png
 *.out
+results*

@@ -24,8 +24,15 @@ class FlickrDataset(Dataset):
         self.is_train_phase = is_train_phase
         self.semantic_nc = semantic_nc
         
-        self.labels = sorted(glob.glob(
-            os.path.join(root, dataset_mode, "labels") + "/*.png"))
+        if os.path.exists(os.path.join(root, dataset_mode)):
+            self.labels = sorted(glob.glob(
+                os.path.join(root, dataset_mode, "labels") + "/*.png"))
+        else:
+            # if the valid dataset didn't exists
+            dataset_mode = "train"
+            self.labels = sorted(glob.glob(
+                os.path.join(root, dataset_mode, "labels") + "/*.png"))
+            self.labels = self.labels[:400]
         self.total_len = len(self.labels)
         print(f"load {self.total_len} images in {dataset_mode}")
 
