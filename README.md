@@ -2,7 +2,7 @@
 ## Descripition
 This repository is **ST605** team's official implementation of competition [第二届\[计图Jittor\]人工智能挑战赛](https://www.educoder.net/competitions/index/Jittor-3) issue 1(赛题一) which is a semantic image synthesis task. All of the codes are based on a newly deep learning freamwork [Jittor](https://cg.cs.tsinghua.edu.cn/jittor/).  Our results achieved 6th rank in track A and 7th in track B.
 
-<img src="./selects/6763885_1e1de3595e_b.jpg" width="300px"> <img src="./selects/4938686252_5f8e828799_b.jpg" width="300px"> <img src="./selects/26073140953_c90b711711_b.jpg" width="300px">
+<img src="./selects/6763885_1e1de3595e_b.jpg" width="250px"> <img src="./selects/4938686252_5f8e828799_b.jpg" width="250px"> <img src="./selects/26073140953_c90b711711_b.jpg" width="250px">
 
 ## Data Preparation
 For training data and test data with track A and B, please follow the [competition's website](https://www.educoder.net/competitions/index/Jittor-3) for downloading. We assume that all of the real images are with .jpg format and all of the label images are with .png format. If you would like to train on your own dataset, please follow the suggested folder structure:
