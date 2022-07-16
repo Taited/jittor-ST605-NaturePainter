@@ -1,6 +1,7 @@
 # jittor-ST605-NaturePainter
 ## Descripition
 This repository is **ST605** team's official implementation of competition [第二届\[计图Jittor\]人工智能挑战赛](https://www.educoder.net/competitions/index/Jittor-3) issue 1(赛题一) which is a semantic image synthesis task. All of the codes are based on a newly deep learning freamwork [Jittor](https://cg.cs.tsinghua.edu.cn/jittor/).  Our results achieved 6th rank in track A and 7th in track B.
+<img src="./selects/6763885_1e1de3595e_b.jpg" width="400px"> <img src="./selects/4938686252_5f8e828799_b.jpg" width="400px"> <img src="./selects/26073140953_c90b711711_b.jpg" width="400px">
 
 ## Data Preparation
 For training data and test data with track A and B, please follow the [competition's website](https://www.educoder.net/competitions/index/Jittor-3) for downloading. We assume that all of the real images are with .jpg format and all of the label images are with .png format. If you would like to train on your own dataset, please follow the suggested folder structure:
@@ -38,22 +39,22 @@ python3.7 -m pip install --upgrade pip
 python3.7 -m pip install -r requirements.txt
 ```
 ## Training Scripts
-We already set defaul configs in `main.py`. Please specify your own data path by setting `--data_path` with `./dataset/flickr` in Data Preparation. Please specify training log root by setting `--output_path`. 
+We already set defaul configs in `main.py`. Please specify your own data path by setting `--input_path` with `./dataset/flickr` in Data Preparation. Please specify training log root by setting `--training_log_path`. 
 
 For multi-gpu training:
 ```
-CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun -np 4 python3.7 -m main.py --data_path ./dataset/flickr --output_path ./training_log/flickr
+CUDA_VISIBLE_DEVICES="0,1,2,3" mpirun -np 4 python3.7 -m main.py --input_path ./dataset/flickr --training_log_path ./training_log/flickr
 ```
 
-For single training:
+For single gpu training:
 ```
-python3.7 -m main.py --data_path ./dataset/flickr --output_path ./training_log/flickr
+python3.7 -m main.py --input_path ./dataset/flickr --training_log_path ./training_log/flickr
 ```
 
 ## Inference
 The minimal inference requirement is running in a device which GPU memory is geater than `13G`.
 ```
-python3.7 -m inference.py --data_path ./dataset/flickr --ckpt_path your_ckpt.pkl
+python3.7 -m inference.py --input_path ./dataset/flickr --ckpt_path your_ckpt.pkl
 ```
 
 ## Competition Check Codes
