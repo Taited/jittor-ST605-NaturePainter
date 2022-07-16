@@ -64,7 +64,8 @@ For training, run:
 python3.7 train.py --input_path ./flickr
 ```
 
-For generating results, run:
+For generating results, please download ckpt file from [BaiduNetDisk](https://pan.baidu.com/s/1PNxdkI55PTBXH6ITUBSgSQ?pwd=k7pk).
+Then, run:
 ```
 python3.7 test.py --input_path ./flickr/testB/labels --output_path ./results
 ```
